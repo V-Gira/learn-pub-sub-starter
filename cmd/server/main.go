@@ -17,6 +17,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("could not connect to RabbitMQ: %v", err)
 	}
+
+	// nolint
 	defer conn.Close()
 
 	fmt.Println("Peril game server connected to RabbitMQ!")

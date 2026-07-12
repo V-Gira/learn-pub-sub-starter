@@ -1,3 +1,5 @@
+// Package pubsub contains the logic for publishing and subscribing to the
+// RabbitMQ server
 package pubsub
 
 import (

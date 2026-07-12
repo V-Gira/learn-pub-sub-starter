@@ -1,3 +1,4 @@
+// Package routing contains the routing logic for the game
 package routing
 
 const (

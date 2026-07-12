@@ -1,3 +1,4 @@
+// Package gamelogic contains the logic for the game
 package gamelogic
 
 import (
