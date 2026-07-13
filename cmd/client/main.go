@@ -21,7 +21,6 @@ func handlerMove(gs *gamelogic.GameState) func(gamelogic.ArmyMove) {
 	return func(move gamelogic.ArmyMove) {
 		defer fmt.Print("> ")
 		gs.HandleMove(move)
-	)
 	}
 }
 
@@ -94,7 +93,7 @@ func main() {
 			if err != nil {
 				log.Printf("could not publish move: %v", err)
 			}
-			fmt.Println("move sent:")
+			fmt.Println("move sent")
 
 		case "spawn":
 			err = gs.CommandSpawn(words)
