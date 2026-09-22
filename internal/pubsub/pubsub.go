@@ -109,13 +109,17 @@ func DeclareAndBind(
 		return nil, amqp.Queue{}, fmt.Errorf("could not create channel: %v", err)
 	}
 
+	table := amqp.Table{
+		"x-dead-letter-exchange": "peril_dlx",
+	}
+
 	queue, err := ch.QueueDeclare(
 		queueName,                       // name
 		queueType == SimpleQueueDurable, // durable
 		queueType != SimpleQueueDurable, // delete when unused
 		queueType != SimpleQueueDurable, // exclusive
 		false,                           // no-wait
-		nil,                             // args
+		table,                           // args
 	)
 	if err != nil {
 		return nil, amqp.Queue{}, fmt.Errorf("could not declare queue: %v", err)
