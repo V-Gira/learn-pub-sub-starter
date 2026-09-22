@@ -18,7 +18,7 @@ func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) pubsub.Ack
 	}
 }
 
-func handlerMove(gs *gamelogic.GameState) func(gamelogic.ArmyMove) pubsub.Acktype {
+func handlerMove(gs *gamelogic.GameState, ch *amqp.Channel) func(gamelogic.ArmyMove) pubsub.Acktype {
 	return func(move gamelogic.ArmyMove) pubsub.Acktype {
 		defer fmt.Print("> ")
 		outcome := gs.HandleMove(move)
@@ -28,6 +28,39 @@ func handlerMove(gs *gamelogic.GameState) func(gamelogic.ArmyMove) pubsub.Acktyp
 		case gamelogic.MoveOutComeSafe:
 			return pubsub.Ack
 		case gamelogic.MoveOutcomeMakeWar:
+			err := pubsub.PublishJSON(
+				ch,
+				routing.ExchangePerilTopic,
+				routing.WarRecognitionsPrefix+"."+gs.GetUsername(),
+				gamelogic.RecognitionOfWar{
+					Attacker: move.Player,
+					Defender: gs.GetPlayerSnap(),
+				},
+			)
+			if err != nil {
+				return pubsub.NackRequeue
+			}
+			return pubsub.NackRequeue
+		default:
+			return pubsub.NackDiscard
+		}
+	}
+}
+
+func handlerWar(gs *gamelogic.GameState) func(gamelogic.RecognitionOfWar) pubsub.Acktype {
+	return func(rw gamelogic.RecognitionOfWar) pubsub.Acktype {
+		defer fmt.Print("> ")
+		outcome, _, _ := gs.HandleWar(rw)
+		switch outcome {
+		case gamelogic.WarOutcomeNotInvolved:
+			return pubsub.NackRequeue
+		case gamelogic.WarOutcomeNoUnits:
+			return pubsub.NackDiscard
+		case gamelogic.WarOutcomeYouWon:
+			return pubsub.Ack
+		case gamelogic.WarOutcomeOpponentWon:
+			return pubsub.Ack
+		case gamelogic.WarOutcomeDraw:
 			return pubsub.Ack
 		default:
 			return pubsub.NackDiscard
@@ -62,7 +95,8 @@ func main() {
 	err = pubsub.SubscribeJSON(
 		conn,
 		routing.ExchangePerilDirect,
-		routing.PauseKey+"."+gs.GetUsername(), routing.PauseKey,
+		routing.PauseKey+"."+gs.GetUsername(),
+		routing.PauseKey,
 		pubsub.SimpleQueueTransient,
 		handlerPause(gs),
 	)
@@ -76,10 +110,22 @@ func main() {
 		routing.ArmyMovesPrefix+"."+gs.GetUsername(),
 		routing.ArmyMovesPrefix+".*",
 		pubsub.SimpleQueueTransient,
-		handlerMove(gs),
+		handlerMove(gs, publishCh),
 	)
 	if err != nil {
-		log.Fatalf("could not subscribe to pause: %v", err)
+		log.Fatalf("could not subscribe to army moves	: %v", err)
+	}
+
+	err = pubsub.SubscribeJSON(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.WarRecognitionsPrefix,
+		routing.WarRecognitionsPrefix+".*",
+		pubsub.SimpleQueueDurable,
+		handlerWar(gs),
+	)
+	if err != nil {
+		log.Fatalf("could not subscribe to war recognitions: %v", err)
 	}
 
 	for {
